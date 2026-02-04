@@ -26,9 +26,11 @@ Output files are named: {domain}-{type}.csv and {domain}-{type}_unique.csv
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from scrapy import Spider, signals
@@ -360,11 +362,24 @@ class ScraperSpider(Spider):
 # =============================================================================
 
 
-def generate_output_filename(domain, scrape_type):
-    """Generate output filename based on domain and scrape type."""
-    # Clean domain for filename
+def generate_output_path(domain, scrape_type):
+    """Generate output path with folder structure and timestamp."""
+    # Get the script's directory as base
+    script_dir = Path(__file__).parent
+    scraped_sites_dir = script_dir / "scraped-sites"
+
+    # Clean domain for folder name
     clean_domain = domain.replace("www.", "").replace(".", "-")
-    return f"{clean_domain}-{scrape_type}"
+
+    # Create domain-specific folder
+    domain_folder = scraped_sites_dir / clean_domain
+    domain_folder.mkdir(parents=True, exist_ok=True)
+
+    # Add timestamp to filename
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"{clean_domain}-{scrape_type}-{timestamp}"
+
+    return domain_folder / filename
 
 
 def save_results(spider, output_base):
@@ -372,13 +387,21 @@ def save_results(spider, output_base):
     page_file = f"{output_base}.csv"
     unique_file = f"{output_base}_unique.csv"
 
-    # Save page-level results
+    # Save page-level results with one image per row
     if spider.results:
-        fieldnames = ["page_url", "page_title", "image_count", "images"]
+        fieldnames = ["page_url", "page_title", "image_url", "image_alt"]
         with open(page_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(spider.results)
+            for result in spider.results:
+                images = json.loads(result["images"])
+                for i, img in enumerate(images):
+                    writer.writerow({
+                        "page_url": result["page_url"] if i == 0 else "",
+                        "page_title": result["page_title"] if i == 0 else "",
+                        "image_url": img["src"],
+                        "image_alt": img.get("alt", ""),
+                    })
 
     # Save unique images
     if spider.all_images:
@@ -452,7 +475,7 @@ def run_scraper(domain, scrape_type, max_pages=0, delay=1.0, concurrent=2):
         "min_image_height": 50,
     }
 
-    output_base = generate_output_filename(domain, scrape_type)
+    output_base = generate_output_path(domain, scrape_type)
 
     print("=" * 60)
     print("Website Scraper")
@@ -463,7 +486,8 @@ def run_scraper(domain, scrape_type, max_pages=0, delay=1.0, concurrent=2):
     print(f"Concurrent:        {concurrent}")
     if max_pages > 0:
         print(f"Max pages:         {max_pages}")
-    print(f"Output prefix:     {output_base}")
+    print(f"Output folder:     {output_base.parent}")
+    print(f"Output prefix:     {output_base.name}")
     print("=" * 60 + "\n")
 
     # Create and run crawler
