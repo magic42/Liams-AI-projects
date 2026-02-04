@@ -15,37 +15,89 @@ cd /Users/liam.miner/Documents/Liams-AI-projects/crawlers
 python scraper.py --url "www.example.com" --type category
 ```
 
-## Using with Claude Code (@scraper agent)
+---
 
-The easiest way to use this tool is via the `@scraper` agent in Claude Code:
+## Using with Claude Code (`/scraper`)
+
+The easiest way to use this tool is via the `/scraper` skill in Claude Code:
 
 ```
-@scraper scrape www.part-on.co.uk
-@scraper scrape www.example.com for category images
-@scraper get product images from www.example.com
+/scraper www.part-on.co.uk
+/scraper start
 ```
 
-### How the @scraper Agent Works
+### User Journey
 
-1. **Runs a dual test first** - Scrapes 5 category pages AND 5 product pages (10 total)
-2. **Shows you the results** - Displays a table of pages crawled and images found
-3. **Asks for confirmation** - You choose to proceed with categories, products, or both
-4. **Runs full scrape** - Only after you approve
+The `/scraper` skill guides you through a structured workflow with built-in safety nets at every step:
 
-This test-first approach:
-- Validates the scrape will work before committing
-- Shows which page types have images (some sites use JavaScript)
-- Prevents wasted time on sites that block crawlers
-- Has a 2-minute timeout to avoid getting stuck
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: URL Input                                          │
+│  ─────────────────                                          │
+│  Enter your target website URL                              │
+│  → Cleaned automatically (removes http/https, trailing /)   │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 2: Connection Test (Safety Net #1)                    │
+│  ────────────────────────────────────────                   │
+│  Runs a dual test: 5 category + 5 product pages             │
+│  → Shows results table so you can verify it's working       │
+│  → 2-minute timeout prevents getting stuck                  │
+│  → If both fail, stops and offers troubleshooting           │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 3: Target Selection (Safety Net #2)                   │
+│  ─────────────────────────────────────────                  │
+│  You choose what to scrape:                                 │
+│    1. Categories only - excludes homepage/CMS pages         │
+│    2. Products only - excludes homepage/CMS pages           │
+│    3. Full site - everything                                │
+│  → No scrape runs until you explicitly choose               │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 4: Sitemap Option                                     │
+│  ─────────────────────                                      │
+│  Optionally download and format the sitemap.xml             │
+│  → Saved as formatted XML + plain URL list                  │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 5: Full Scrape                                        │
+│  ─────────────────────                                      │
+│  Only runs after you've approved the test results           │
+│  → Outputs to organized folder structure                    │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Step 6: Results Report                                     │
+│  ─────────────────────                                      │
+│  Summary of what was found + file locations                 │
+│  → Offers to open results for you                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Safety Nets & Guardrails
+
+| Safety Net | What It Protects Against |
+|------------|-------------------------|
+| **Connection Test** | Wasting time on sites that block crawlers or use JavaScript rendering |
+| **2-Minute Timeout** | Getting stuck on slow/unresponsive sites |
+| **User Confirmation** | Running full scrapes without understanding the results |
+| **robots.txt Compliance** | Scraping content the site owner has blocked |
+| **Rate Limiting Defaults** | Overloading servers (1s delay, 2 concurrent by default) |
+| **Image Filtering** | Cluttering results with icons, placeholders, and tracking pixels |
 
 ### Example Interaction
 
 ```
-User: @scraper scrape www.part-on.co.uk
+User: /scraper www.part-on.co.uk
 
 Agent: Running test scrapes (5 category + 5 product pages)...
 
-**Test Scrape Results for www.part-on.co.uk**
+**Connection Test Results for www.part-on.co.uk**
 
 ### Category Pages (5 tested)
 | Page | Images Found |
@@ -69,11 +121,14 @@ Agent: Running test scrapes (5 category + 5 product pages)...
 - Category pages: 71 images from 5 pages
 - Product pages: 30 images from 5 pages
 
-Would you like me to proceed? Which type: category, product, or both?
+What would you like to scrape?
+1. Categories only
+2. Products only
+3. Full site
 
 User: Just categories please
 
-Agent: [runs full scrape, opens CSV when done]
+Agent: [asks about sitemap, then runs full scrape, reports results]
 ```
 
 ---
